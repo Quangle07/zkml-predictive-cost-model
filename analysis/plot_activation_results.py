@@ -1,8 +1,16 @@
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 1. Load the dataset
-file_path = "activation_results_complete.csv"
+# Get the directory where this script lives (.../analysis)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Go up one level to the main repository folder
+project_root = os.path.dirname(script_dir)
+# Exact paths to the data and figures folders
+file_path = os.path.join(project_root, "data", "activation_results_complete.csv")
+save_path = os.path.join(project_root, "figures", "final_activation_analysis.png")
+
+# Load the dataset
 df = pd.read_csv(file_path)
 
 # Set up colors
@@ -66,8 +74,8 @@ axes[2].legend(fontsize=11)
 
 # Clean up the layout and save
 plt.tight_layout()
-plt.savefig("final_activation_analysis.png", dpi=300, bbox_inches='tight')
-print(" Success! Check your directory for 'final_activation_analysis.png'")
+plt.savefig(save_path, dpi=300, bbox_inches='tight')
+print(f" Success! Saved image to {save_path}")
 
 # Uncomment the line below if you are running this locally and want a popup window:
 plt.show()
