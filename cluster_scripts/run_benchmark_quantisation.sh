@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#$ -N ezkl_activations
+#$ -N ezkl_quant
 #$ -cwd
 #$ -l h_rt=24:00:00
 #$ -l h_vmem=64G
