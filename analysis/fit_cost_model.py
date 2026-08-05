@@ -3,11 +3,17 @@ import pandas as pd
 import numpy as np
 
 def load_dataset(filename):
-    paths = [filename, os.path.join("data", filename)]
-    for p in paths:
-        if os.path.exists(p):
-            return pd.read_csv(p)
-    return None
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Go into the "data" folder
+    data_dir = os.path.join(script_dir, "..", "data")
+    # Combine them to get the exact file path
+    file_path = os.path.join(data_dir, filename)
+    
+    if os.path.exists(file_path):
+        return pd.read_csv(file_path)
+    else:
+        print(f"[!] Warning: Data file not found at {os.path.abspath(file_path)}")
+        return None
 
 # Load Datasets
 df_linear = load_dataset("linear_only_results.csv")
