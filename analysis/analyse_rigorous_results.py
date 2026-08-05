@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 
 def analyse_results(csv_path="high_res_rigorous_results.csv"):
+    # Dynamically resolve path: analysis/../data/filename.csv
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    csv_path = os.path.join(os.path.dirname(script_dir), "data", csv_filename)
+    
     try:
         df = pd.read_csv(csv_path)
     except FileNotFoundError:
