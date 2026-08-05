@@ -88,3 +88,36 @@ def analyse_results(csv_path="high_res_rigorous_results.csv"):
 
 if __name__ == "__main__":
     analyse_results()
+
+#======================================================================
+# ZKML COST MODEL - HIGH RESOLUTION STATISTICAL ANALYSIS 
+#======================================================================
+#
+#[1] DENSE / LINEAR LAYER FIT
+#    - Alpha (Time per output element): 9.8239 ms/element
+#    - Base Setup Time (R_base):        11.81 s
+#
+#[2] SIGMOID (LOOKUP TABLE) FIT
+#    - Beta (Time per LUT element):     3.4271 ms/element
+#    - Base Setup Time (R_base):        19.46 s
+#
+#[3] SPATIAL CONVOLUTION (CONV2D) FIT
+#    - Gamma (Time per MAC):            328.2724 μs/MAC
+#    - Base Setup Time (R_base):        17.13 s
+#
+#[4] COMPOSITE CNN PREDICTION ACCURACY
+#    Channels   | Actual Time     | Predicted Time  | Error (%)
+#    ------------------------------------------------------------
+#    8          | 62.27        s | 85.83        s | 37.8%
+#    16         | 108.87       s | 154.54       s | 41.9%
+#    24         | 153.17       s | 223.24       s | 45.8%
+#    32         | 218.56       s | 291.95       s | 33.6%
+#    40         | 249.30       s | 360.66       s | 44.7%
+#    48         | 295.15       s | 429.36       s | 45.5%
+#    56         | 339.49       s | 498.07       s | 46.7%
+#    64         | 396.51       s | 566.78       s | 42.9%
+#
+#    --> Overall Mean Absolute Percentage Error (MAPE): 42.36%
+#======================================================================
+
+
