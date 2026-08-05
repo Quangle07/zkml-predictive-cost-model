@@ -85,3 +85,23 @@ def analyse_transformers():
 
 if __name__ == "__main__":
     analyse_transformers()
+
+#===========================================================================
+# ZKML COST MODEL - TRANSFORMER ARCHITECTURE ANALYSIS 
+#===========================================================================
+#
+#[1] ISOLATED TRANSFORMER COMPONENTS
+#    - Linear    (Time per element): 9.8239 ms/element
+#    - GELU      (Time per element): 16.1851 ms/element
+#    - LayerNorm (Time per dim):     333.5424 ms/dim
+#    - Attention (Time per dim):     2066.6735 ms/dim
+#    - Shared Base Setup (R_base):   123.38 s
+#
+#[2] TRANSFORMER BLOCK FUSION TEST (FIXED)
+#    Dim    | Actual Time  | Sum of Parts    | Implied Delta
+#    -------------------------------------------------------
+#    16     | 276.73     s | 369.79        s | 0.4147
+#    32     | 417.83     s | 1383.41       s | 0.2128
+#
+#    --> Mean Transformer Fusion Delta: 0.3138
+#===========================================================================
