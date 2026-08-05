@@ -112,7 +112,7 @@ To predict computational cost, machine learning operations are mapped directly t
 
 #### 2. The Failure of Layer-Based Additivity
 
-Standard ML models assume $Cost(A + B) = Cost(A) + Cost(B)$. In ZKML, compiler graph optimisation (fusing adjacent layers like `Conv2D` $\to$ `ReLU`) and horizontal column packing mean that adding layers often incurs zero additional proving penalty, rendering standard linear regression on PyTorch layer types highly inaccurate.
+Standard ML models assume $Cost(A + B) = Cost(A) + Cost(B)$. In ZKML, compiler graph optimisation (fusing adjacent layers like `Conv2D` $\to$ `ReLU`) and horizontal column packing mean that adding layers often incurs zero additional proving penalty, rendering standard linear regression on PyTorch layer types (`analysis/fit_cost_model.py`) highly inaccurate.
 
 #### 3. Cryptographic Grid Bounds ($2^k$)
 
@@ -133,6 +133,31 @@ $$\widehat{T}_{\text{prove}} = w_{\text{fft}} \cdot (D_{\text{size}} \log_2 D_{\
 
 ---
 
+## Model Fitting & Parameter Identification
+
+Using Non-Negative Least Squares (NNLS) optimisation via `analysis/analyse_cryptographic_math.py`, we extracted the fundamental time coefficients for the Halo2/EZKL backend. The model was fitted on a merged dataset of 50 benchmark runs comprising both CNNs and Transformer blocks (aggregated from `data/high_res_rigorous_results.csv`, `data/transformer_block_results.csv`, and `data/deep_validation_results.csv`).
+
+### Fitted Operational Parameters
+
+| Parameter | Feature Name | Mathematical Term | Fitted Value | Physical Meaning / Description |
+| --- | --- | --- | --- | --- |
+| **$w_{\text{fft}}$** | `fft_work` | $D_{\text{size}} \log_2 D_{\text{size}}$ | **$2.9350 \times 10^{-8}\text{ s}$** | FFT processing time per domain element unit |
+| **$w_{\text{msm}}$** | `msm_work` | $D_{\text{size}}$ | **$0.0000 \times 10^{0}\text{ s}$** | Linear MSM overhead (zeroed due to FFT $\mathcal{O}(N \log N)$ dominance) |
+| **$w_{\text{assign}}$** | `total_assignments` | $A_{\text{total}}$ | **$1.5115 \times 10^{-4}\text{ s}$** | Time per populated active cell assignment (Grid Density) |
+| **$w_{\text{lookup}}$** | `lookup_span` | $L_{\text{span}}$ | **$9.7656 \times 10^{-4}\text{ s}$** | Time penalty per non-linear lookup table entry |
+| **$w_{\text{const}}$** | `total_const_size` | $C_{\text{size}}$ | **$6.6258 \times 10^{-2}\text{ s}$** | Time penalty per static parameter weight commitment |
+
+> **Note on $w_{\text{msm}} = 0$:** Because $D_{\text{size}} \log_2 D_{\text{size}}$ and $D_{\text{size}}$ scale concurrently with grid height $k$, NNLS identified FFT complexity $\mathcal{O}(N \log_2 N)$ as the primary driver of domain latency, zeroing out $w_{\text{msm}}$ to eliminate collinear redundancy. 
+
+### Definitive Predictive Formula
+
+$$\widehat{T}_{\text{prove}} \approx (2.94 \times 10^{-8}) \cdot (D_{\text{size}} \log_2 D_{\text{size}}) + (1.51 \times 10^{-4}) \cdot A_{\text{total}} + (9.77 \times 10^{-4}) \cdot L_{\text{span}} + (6.63 \times 10^{-2}) \cdot C_{\text{size}}$$
+
+---
+
+
+
+---
 
 ## Reproduction Instructions:
 
