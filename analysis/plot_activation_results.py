@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # 1. Load the dataset
-file_path = "activation_results_complete_node.csv"
+file_path = "activation_results_complete.csv"
 df = pd.read_csv(file_path)
 
 # Set up colors
