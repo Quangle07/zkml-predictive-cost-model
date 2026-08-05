@@ -2,6 +2,15 @@ import pandas as pd
 import numpy as np
 
 def analyse_transformers():
+    # Find the absolute path to the data/ folder
+    script_dir = os.path.dirname(os.path.abspath(__file__)) # Gets the path to the analysis/ folder
+    data_dir = os.path.join(script_dir, '..', 'data')       # Goes up one level, then into data/
+
+    # Construct the full file paths
+    iso_path = os.path.join(data_dir, "transformer_benchmark_results.csv")
+    block_path = os.path.join(data_dir, "transformer_block_results.csv")
+    cnn_path = os.path.join(data_dir, "high_res_rigorous_results.csv")
+    
     # Load all datasets
     try:
         df_iso = pd.read_csv("transformer_benchmark_results.csv")
