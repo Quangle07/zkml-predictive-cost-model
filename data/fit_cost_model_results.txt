@@ -1,0 +1,27 @@
+============================================================
+ ZKML PREDICTIVE COST MODEL FITTING RESULTS 
+============================================================
+
+[1] DENSE / LINEAR LAYER FIT:
+    - Alpha (Time per output element): 6.6071 ms/element
+    - Baseline Time Intercept:         26.96 s
+
+[2] SIGMOID (LOOKUP TABLE) FIT:
+    - Beta (Time per LUT lookup element): 2.9196 ms/element
+    - LUT Table Setup Base Time:          28.41 s
+
+[3] SPATIAL CONVOLUTION (CONV2D) FIT:
+    - Gamma (Time per kernel Multiply-Accumulate): 452.2031 μs/MAC
+    - Conv Baseline Base Time:                      27.28 s
+
+[4] COMPOSITE CNN PIPELINE VALIDATION:
+    Evaluating Model Additivity on MiniCNN Pipeline...
+
+    Channels | Actual Time | Predicted Time | Error (%)
+    --------------------------------------------------
+           8 |      75.73s |         86.37s |     14.1%
+          16 |     127.04s |        145.46s |     14.5%
+          24 |     183.95s |        204.55s |     11.2%
+
+    --> Mean Absolute Percentage Error (MAPE): 13.25%
+============================================================
