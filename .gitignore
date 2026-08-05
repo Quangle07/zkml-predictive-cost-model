@@ -1,0 +1,44 @@
+
+# Python Core
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
+
+venv/
+env/
+.env
+.venv
+*.conda/
+
+# EZKL & Halo2 Cryptographic Artifacts (DO NOT COMMIT)
+
+*.onnx
+*.srs
+*.vk
+*.pk
+*.proof
+*.compiled
+network.json
+settings.json
+witness.json
+
+# Logs and HPC Output
+
+*.log
+*.err
+*.out
+*.o*
+*.e*
+core.*
+
+# OS & IDE Files
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.ipynb_checkpoints/
