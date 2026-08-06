@@ -419,6 +419,32 @@ $$\widehat{T}_{\text{prove}} \approx (2.94 \times 10^{-8}) \cdot (D_{\text{size}
 
 ---
 
+### Phase 12: Empirical Pareto Frontier & Architecture Optimization
+
+*Generated via `benchmarks/train_mnist_models.py`, `benchmarks/compile_quantised_models.py`, `analysis/evaluate_pareto_costs.py`, and `benchmarks/evaluate_true_quantised_accuracies.py`. Evaluated via `analysis/plot_pareto_frontier.py`.*
+
+To demonstrate the practical application of the cost model, we constructed an empirical Pareto frontier mapping test accuracy against predicted proving time on the MNIST dataset. We evaluated 8 different neural network architectures (varying depth, width, convolutions, and non-linear activations) across 5 bit-width quantization scales (16-bit down to 4-bit), resulting in 40 unique ZKML configurations.
+
+![Empirical ZKML Pareto Frontier](pareto_frontier_final.png)
+
+This empirical dataset revealed four definitive architectural guidelines for ZKML engineers:
+
+#### 1. The 12-Bit optimal operating point for Modern Activations
+Because non-linear operations (like GELU and Sigmoid) require physical lookup tables that scale by $2^{\text{bits}}$, reducing precision from 16-bit to 12-bit slashed proving time by **66%** (e.g., Model F dropping from 91.12s to 31.12s) while retaining **100%** of its baseline accuracy. 
+
+#### 2. Architectural Configuration: Depth Beats Width
+In standard ML, wide and deep networks might exhibit similar GPU latencies. In ZKML, active cell assignments dictate cost. Model E (Deep, narrow MLP) achieved $97.22\%$ accuracy in just **19.46s**, whereas Model A (Shallow, wide MLP) took **41.67s** to achieve similar results. ZK architectures should therefore prioritise layer depth over neuron width.
+
+#### 3. The 8-Bit Quantization Floor
+Naive post-training quantisation holds strong down to 8 bits. However, crossing into 6-bit or 4-bit precision without ZK-aware retraining caused an accuracy collapse (dropping to 10%–30%), therefore establishing 8-bit as the functional floor for out-of-the-box EZKL compilation.
+
+#### 4. The Convolutional Overhead
+Spatial convolutions incur massive assignment penalties due to dense cross-multiplication and column packing. Model G (Medium CNN) required **194.38s** to prove—a $10\times$ time penalty over the Deep MLP (Model E) for less than a $0.8\%$ gain in accuracy. 
+
+> **Key Finding:** By targeting the specific cryptographic constraints of the Halo2 grid (minimizing $L_{\text{span}}$ via 12-bit quantisation, and minimizing $A_{\text{total}}$ by avoiding CNNs and wide layers), developers can achieve optimal accuracy at a fraction of the proving cost.
+
+---
+
 ## Reproduction Instructions:
 
 ### 1. Environment Setup
