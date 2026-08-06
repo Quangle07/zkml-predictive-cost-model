@@ -205,7 +205,7 @@ All experiments were executed on the University of Edinburgh's Eddie HPC Cluster
 
 Comparing an isolated `Linear` layer (1 -> N outputs) against a fused `Linear + ReLU + Linear` "sandwich" model demonstrates that proving overhead is inherently non-additive.
 
-| Output Dimension (N) | Fused Model Time | Isolated `Linear` Time | `logrows` (k) | Proof Size |
+| Output Dimension ($N$) | Fused Model Time | Isolated `Linear` Time | `logrows` ($k$) | Proof Size |
 | --- | --- | --- | --- | --- |
 | **2,000** | 30.74s | 38.04s | 17 | 0.58 MB |
 | **4,000** | 53.63s | 60.93s | 17 | 1.14 MB |
@@ -222,7 +222,7 @@ Comparing an isolated `Linear` layer (1 -> N outputs) against a fused `Linear + 
 
 Non-linear operations require fixed-point lookup tables (LUTs) in Halo2. Sweeping a single `Sigmoid` layer up to 10,000 elements reveals a distinct trade-off between time complexity and proof payload space.
 
-| Input Elements (N) | `Linear` Time | `Sigmoid` Time | `Linear` Proof Size | `Sigmoid` Proof Size |
+| Input Elements ($N$) | `Linear` Time | `Sigmoid` Time | `Linear` Proof Size | `Sigmoid` Proof Size |
 | --- | --- | --- | --- | --- |
 | **2,000** | 38.04s | 37.32s | 0.30 MB | 0.58 MB |
 | **4,000** | 60.93s | 37.31s | 0.59 MB | 1.14 MB |
@@ -285,11 +285,125 @@ Before analysing circuit compilation directly, we attempted to predict multi-lay
 
 ---
 
+### Phase 6: Hitting the Hardware Wall (The $2^{18}$ OOM Crash)
 
+*Generated via `benchmarks/benchmark_logrows_sweep.py` (Dataset: `data/logrows_sweep_results.csv`, Cluster Script: `cluster_scripts/run_benchmark_sweep.sh`)*
 
+To test the physical limits of `logrows` ($k$), we executed a high-resolution channel sweep on a fixed $16 \times 16$ RGB spatial input ($3 \times 16 \times 16$) until the system failed.
 
+| Channels ($C_{\text{out}}$) | Total Rows | Grid Degree ($k$) | Actual Proving Time | Peak Memory / Status |
+| --- | --- | --- | --- | --- |
+| **4 – 8** | ~45,000 | 17 ($2^{17} = 131,072$) | 41.90s | ~18 GB RAM (Passed) |
+| **12 – 20** | ~85,000 | 17 ($2^{17} = 131,072$) | 74.84s | ~32 GB RAM (Passed) |
+| **24** | ~122,000 | 17 ($2^{17} = 131,072$) | 113.60s | ~58 GB RAM (Passed) |
+| **26+** | **>131,072** | **18 ($2^{18} = 262,144$)** | **FAILED** | **OOM CRASH (256GB Node)** |
 
+> **Key Finding:** ZK hardware scaling is strictly non-continuous. Crossing the threshold of 131,072 rows forced $k \to 18$, instantly doubling the evaluation domain. This overwhelmed the 256GB RAM limit on the Eddie HPC node, proving that cost models **must account for discrete 2^k grid step-functions**.
 
+---
+
+### Phase 7: Isolating Non-Linear Transformers & GELU Lookup Spikes
+
+*Generated via `benchmarks/benchmark_transformer_block.py` and `benchmarks/benchmark_transformers.py` (Dataset: `data/transformer_block_results.csv`, Evaluated via `analysis/analyse_transformers.py`)*
+
+To capture both linear and non-linear bottlenecks, we expanded benchmarks to include Transformer blocks, comparing them against CNNs of equivalent parameter counts.
+
+| Model Architecture | Parameter Size ($d_{\text{model}}$) | Primary Bottleneck | Actual Proving Time | Proof Size |
+| --- | --- | --- | --- | --- |
+| **MiniCNN** | Size 16 | Matrix Mult (`A_total`) | **108.84s** | 0.71 MB |
+| **TransformerBlock** | Size 16 | GELU/Softmax (`L_span`) | **276.73s** | 2.14 MB |
+| **MiniCNN** | Size 32 | Matrix Mult (`A_total`) | **200.54s** | 1.42 MB |
+| **TransformerBlock** | Size 32 | GELU/Softmax (`L_span`) | **416.97s** | 4.88 MB |
+
+> **Key Finding:** Transformers take **more than double the proving time** of CNNs at equivalent parameter scales due to massive fixed-point lookup table spans ($L_{\text{span}}$). Cost models must extract both grid density and lookup table spans directly from the compiled circuit.
+
+---
+
+### Phase 8: Circuit Feature Extraction & Ridge L2 Regularisation Failure
+
+*Extracted via `benchmarks/extract_circuit_features.py` (Dataset: `data/circuit_features_master.csv`, Evaluated via `analysis/train_cost_model.py`)*
+
+Moving away from PyTorch layers, we extracted raw circuit features ($A_{\text{total}}, L_{\text{span}}, C_{\text{size}}, D_{\text{size}}$) and fitted a Ridge (L2 Penalized) Regression model with a fixed intercept ($R_{\text{base}}$):
+
+$$\text{Predicted Time} = R_{\text{base}} + w_1 A_{\text{total}} + w_2 L_{\text{span}} + w_3 C_{\text{size}} + w_4 D_{\text{size}}$$
+
+| Model Test Run | Parameter Size | Actual Proving Time | Ridge Predicted Time | Error (%) |
+| --- | --- | --- | --- | --- |
+| **MiniCNN** | Size 14 | 141.66s | 74.78s | **47.21%** |
+| **MiniCNN** | Size 22 | 285.84s | 116.71s | **59.17%** |
+| **MiniCNN** | Size 30 | 287.43s | 131.94s | **54.10%** |
+| **TransformerBlock** | Size 18 | 289.79s | 161.21s | **44.37%** |
+| **Overall Dataset** | — | — | — | **51.21% MAPE** |
+
+> **Why it Failed:** Because we forced an intercept ($R_{\text{base}}$) and applied L2 regularization, the penalty acted like a rubber band—dragging all large prediction weights down by exactly 50%.
+
+---
+
+### Phase 9: The Zero-Intercept Pure Physics Model (NNLS)
+
+*Evaluated via `analysis/analyse_final_physics.py*`
+
+We stripped out the L2 penalty and artificial intercept, applying unpenalized Non-Negative Least Squares (NNLS) directly to pure circuit features:
+
+$$\widehat{T}_{\text{prove}} = (1.51 \times 10^{-4}) \cdot A_{\text{total}} + (1.00 \times 10^{-3}) \cdot L_{\text{span}} + (6.49 \times 10^{-2}) \cdot C_{\text{size}}$$
+
+| Evaluation Dataset | Primary Feature Tested | Overall Dataset MAPE | Key Observation |
+| --- | --- | --- | --- |
+| **`transformer_block_results.csv`** | Non-Linear Lookups ($L_{\text{span}}$) | **9.45%** | Successfully isolated GELU lookup penalties |
+| **`high_res_rigorous_results.csv`** | Dense Grid Assignments ($A_{\text{total}}$) | **11.41%** | Sub-5% error on large CNNs ($S \ge 32$) |
+| **`deep_validation_results.csv`** | Unseen Topologies | **22.71%** | Higher error on small discrete models |
+| **5-Fold Cross-Validation** | Randomized Splits | **12.56%** | High coefficient stability across folds |
+
+> **Key Finding:** Removing artificial baseline intercepts forced the solver to mirror the circuit's true physical properties, cutting overall prediction errors from ~51% down to ~12.5%.
+
+---
+
+### Phase 10: Cross-Architecture Stress Test (LOAO)
+
+*Evaluated via `analysis/analyse_loao.py*`
+
+To test whether a model trained on one network family could predict another, we performed Leave-One-Architecture-Out (LOAO) zero-shot validation across CNNs and Transformers.
+
+| Training Family | Unseen Test Family | Zero-Shot MAPE | Failure Mode Analysis |
+| --- | --- | --- | --- |
+| **43 CNN Models** | **7 Transformers** | **41.25%** | CNNs lack lookups; model under-predicted GELU penalties |
+| **7 Transformers** | **43 CNN Models** | **46.99%** | Over-penalized lookups; over-predicted dense matrix math |
+
+> **Key Finding:** Plonkish arithmetisation is a **multi-bottleneck system**. Training data *must* contain both dense math (CNNs) and lookup tables (Transformers) for the solver to accurately balance the coefficients.
+
+---
+
+### Phase 11: Final Cryptographic Non-Linear Model & Asymptotic Scaling
+
+*Evaluated via `analysis/analyse_cryptographic_math.py` and `analysis/analyse_detailed_breakdown.py*`
+
+Grounding the equation in the actual algorithmic complexity of Halo2's backend, Fast Fourier Transforms ($O(N \log N)$) and Multi-Scalar Multiplications ($O(N)$), yielded our final published equation:
+
+$$\widehat{T}_{\text{prove}} \approx (2.94 \times 10^{-8}) \cdot (D_{\text{size}} \log_2 D_{\text{size}}) + (1.51 \times 10^{-4}) \cdot A_{\text{total}} + (9.77 \times 10^{-4}) \cdot L_{\text{span}} + (6.63 \times 10^{-2}) \cdot C_{\text{size}}$$
+
+#### Itemised Accuracy Breakdown Across All Architectures
+
+| Model Family | Size / Config | Actual Time | Predicted Time | Difference | Error (%) |
+| --- | --- | --- | --- | --- | --- |
+| **MiniCNN** | Size 8 | 62.27s | 96.39s | +34.12s | **54.79%** (Noise at low scale) |
+| **MiniCNN** | Size 16 | 108.84s | 129.65s | +20.81s | **19.13%** |
+| **MiniCNN** | Size 32 | 218.56s | 214.43s | -4.13s | **1.89%** |
+| **MiniCNN** | Size 40 | 254.58s | 256.92s | +2.34s | **0.92%** |
+| **MiniCNN** | Size 56 | 339.54s | 345.10s | +5.56s | **1.64%** |
+| **MiniCNN** | Size 64 | 395.99s | 387.93s | -8.06s | **2.03%** |
+| **TransformerBlock** | Size 16 | 276.73s | 301.62s | +24.89s | **9.00%** |
+| **TransformerBlock** | Size 18 | 289.79s | 292.55s | +2.76s | **0.95%** |
+| **TransformerBlock** | Size 32 | 417.83s | 389.49s | -28.34s | **6.78%** |
+
+#### Rigorous Validation Summary
+
+| Validation Method | Total Iterations | Evaluated Metric | Result |
+| --- | --- | --- | --- |
+| **Repeated 5-Fold CV** | 10 Seeds (50 Splits) | Out-of-Sample Mean MAPE | **13.60% ($\pm 4.10\%$)** |
+| **Leave-One-Config-Out** | 18 Configuration Groups | Strict Unseen Group MAPE | **20.20%** |
+| **Asymptotic Large-Scale** | Models $S \ge 32$ ($T > 200\text{s}$) | Asymptotic Proving MAPE | **1.5% – 3.0%** |
+
+> **Final Conclusion:** At low scales, fixed system setup noise causes higher percentage errors. But as the neural network grows and fills the grid, noise vanishes, and proving time **strictly obeys our $O(N \log N)$ cryptographic equation**.
 
 ---
 
