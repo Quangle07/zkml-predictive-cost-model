@@ -17,7 +17,7 @@ zkml-predictive-cost-model/
 │
 ├── README.md                          # Project and results write-up
 ├── requirements.txt                   # Environment dependencies (PyTorch, EZKL, scikit-learn, etc.)
-├── .gitignore                         # Excludes temporary cache files, HPC logs, and EZKL artifacts
+├── .gitignore                         # Excludes temporary cache files, HPC logs, and EZKL artefacts
 │
 ├── benchmarks/                        # Python scripts that execute EZKL circuit compilations
 │   ├── benchmark_activation_complete.py
@@ -84,7 +84,7 @@ zkml-predictive-cost-model/
     ├── analyse_deep_val.py
     ├── analyse_final_physics.py       # Phase 9: Pure NNLS zero-intercept model
     ├── analyse_hybrid_model.py
-    ├── analyse_loao.py                # Leave-One-Architecture-Out zero-shot generalization script
+    ├── analyse_loao.py                # Leave-One-Architecture-Out zero-shot generalisation script
     ├── analyse_rigorous_cv.py         # Repeated K-Fold & Leave-One-Config-Out (scikit-learn)
     ├── analyse_rigorous_results.py
     ├── analyse_rigorous_results_delta.py
@@ -157,7 +157,7 @@ $$\widehat{T}_{\text{prove}} \approx (2.94 \times 10^{-8}) \cdot (D_{\text{size}
 
 ## Model Validation
 
-To ensure the model is mathematically stable and to prevent overfitting, we conducted three validation stress tests using `analysis/analyse_rigorous_cv.py`, `analysis/analyse_loao.py`, and `analysis/analyse_detailed_breakdown.py`.
+To ensure the model is mathematically stable and to prevent overfitting, we conducted three validation stress tests using `analysis/analyse_rigorous_cv.py`, `analysis/analyse_loao.py`, and `analysis/analyse_cryptographic_math.py`.
 
 ### 1. Repeated 5-Fold Cross-Validation (10 Seeds / 50 Splits)
 
@@ -184,11 +184,11 @@ Executed via `analysis/analyse_loao.py`, this test isolates entire architectural
 * **Train on CNNs $\to$ Predict Transformers:** **41.25% MAPE**
 * **Train on Transformers $\to$ Predict CNNs:** **46.99% MAPE**
 
-> **Conclusion:** ZK cost profiling requires diverse benchmarks. CNNs are constrained by dense matrix assignments ($A_{\text{total}}$), whereas Transformers are bound by non-linear lookups ($L_{\text{span}}$). Training on a single architecture causes "feature starvation," rendering it incapable of calculating the alternative constraint
+> **Conclusion:** ZK cost profiling requires diverse benchmarks. CNNs are constrained by dense matrix assignments ($A_{\text{total}}$), whereas Transformers are bound by non-linear lookups ($L_{\text{span}}$). Training on a single architecture causes "feature starvation," rendering it incapable of calculating the alternative constraint.
 
 ### 4. Asymptotic Accuracy at Scale
 
-Extracted from the itemised predictions in `analysis/analyse_detailed_breakdown.py`, the model's accuracy improves dramatically as the neural network size increases.
+Extracted from the itemised predictions in `analysis/analyse_cryptographic_math.py`, the model's accuracy improves dramatically as the neural network size increases.
 
 * **Large CNNs ($>300$s proving time):** The error rate drops to between **1.5% and 3.0%**. At low compute scales, fixed system overheads (OS background noise, memory allocation) skew percentage errors. At scale, this noise becomes mathematically negligible, and proving time strictly adheres to the derived $\mathcal{O}(N \log N)$ FFT complexity.
 * **Transformer "Lookup Spike":** Testing solely on Multi-Head Attention blocks yielded an **8.08% average error**. The $L_{\text{span}}$ variable successfully isolated the massive computational penalty of non-linear GELU/Softmax tables that breaks traditional parameter-counting ML cost models.
@@ -323,7 +323,7 @@ To capture both linear and non-linear bottlenecks, we expanded benchmarks to inc
 
 *Extracted via `benchmarks/extract_circuit_features.py` (Dataset: `data/circuit_features_master.csv`, Evaluated via `analysis/train_cost_model.py`)*
 
-Moving away from PyTorch layers, we extracted raw circuit features ($A_{\text{total}}, L_{\text{span}}, C_{\text{size}}, D_{\text{size}}$) and fitted a Ridge (L2 Penalized) Regression model with a fixed intercept ($R_{\text{base}}$):
+Moving away from PyTorch layers, we extracted raw circuit features ($A_{\text{total}}, L_{\text{span}}, C_{\text{size}}, D_{\text{size}}$) and fitted a Ridge (L2 Penalised) Regression model with a fixed intercept ($R_{\text{base}}$):
 
 $$\text{Predicted Time} = R_{\text{base}} + w_1 A_{\text{total}} + w_2 L_{\text{span}} + w_3 C_{\text{size}} + w_4 D_{\text{size}}$$
 
@@ -335,15 +335,15 @@ $$\text{Predicted Time} = R_{\text{base}} + w_1 A_{\text{total}} + w_2 L_{\text{
 | **TransformerBlock** | Size 18 | 289.79s | 161.21s | **44.37%** |
 | **Overall Dataset** | — | — | — | **51.21% MAPE** |
 
-> **Why it Failed:** Because we forced an intercept ($R_{\text{base}}$) and applied L2 regularization, the penalty acted like a rubber band—dragging all large prediction weights down by exactly 50%.
+> **Why it Failed:** Because we forced an intercept ($R_{\text{base}}$) and applied L2 regularisation, the penalty acted like a rubber band—dragging all large prediction weights down by exactly 50%.
 
 ---
 
 ### Phase 9: The Zero-Intercept Pure Physics Model (NNLS)
 
-*Evaluated via `analysis/analyse_final_physics.py*`
+*Evaluated via `analysis/analyse_final_physics.py`*
 
-We stripped out the L2 penalty and artificial intercept, applying unpenalized Non-Negative Least Squares (NNLS) directly to pure circuit features:
+We stripped out the L2 penalty and artificial intercept, applying unpenalised Non-Negative Least Squares (NNLS) directly to pure circuit features:
 
 $$\widehat{T}_{\text{prove}} = (1.51 \times 10^{-4}) \cdot A_{\text{total}} + (1.00 \times 10^{-3}) \cdot L_{\text{span}} + (6.49 \times 10^{-2}) \cdot C_{\text{size}}$$
 
@@ -352,7 +352,7 @@ $$\widehat{T}_{\text{prove}} = (1.51 \times 10^{-4}) \cdot A_{\text{total}} + (1
 | **`transformer_block_results.csv`** | Non-Linear Lookups ($L_{\text{span}}$) | **9.45%** | Successfully isolated GELU lookup penalties |
 | **`high_res_rigorous_results.csv`** | Dense Grid Assignments ($A_{\text{total}}$) | **11.41%** | Sub-5% error on large CNNs ($S \ge 32$) |
 | **`deep_validation_results.csv`** | Unseen Topologies | **22.71%** | Higher error on small discrete models |
-| **5-Fold Cross-Validation** | Randomized Splits | **12.56%** | High coefficient stability across folds |
+| **5-Fold Cross-Validation** | Randomised Splits | **12.56%** | High coefficient stability across folds |
 
 > **Key Finding:** Removing artificial baseline intercepts forced the solver to mirror the circuit's true physical properties, cutting overall prediction errors from ~51% down to ~12.5%.
 
@@ -360,22 +360,22 @@ $$\widehat{T}_{\text{prove}} = (1.51 \times 10^{-4}) \cdot A_{\text{total}} + (1
 
 ### Phase 10: Cross-Architecture Stress Test (LOAO)
 
-*Evaluated via `analysis/analyse_loao.py*`
+*Evaluated via `analysis/analyse_loao.py`*
 
 To test whether a model trained on one network family could predict another, we performed Leave-One-Architecture-Out (LOAO) zero-shot validation across CNNs and Transformers.
 
 | Training Family | Unseen Test Family | Zero-Shot MAPE | Failure Mode Analysis |
 | --- | --- | --- | --- |
 | **43 CNN Models** | **7 Transformers** | **41.25%** | CNNs lack lookups; model under-predicted GELU penalties |
-| **7 Transformers** | **43 CNN Models** | **46.99%** | Over-penalized lookups; over-predicted dense matrix math |
+| **7 Transformers** | **43 CNN Models** | **46.99%** | Over-penalised lookups; over-predicted dense matrix maths |
 
-> **Key Finding:** Plonkish arithmetisation is a **multi-bottleneck system**. Training data *must* contain both dense math (CNNs) and lookup tables (Transformers) for the solver to accurately balance the coefficients.
+> **Key Finding:** Plonkish arithmetisation is a **multi-bottleneck system**. Training data *must* contain both dense maths (CNNs) and lookup tables (Transformers) for the solver to accurately balance the coefficients.
 
 ---
 
 ### Phase 11: Final Cryptographic Non-Linear Model & Asymptotic Scaling
 
-*Evaluated via `analysis/analyse_cryptographic_math.py` and `analysis/analyse_detailed_breakdown.py*`
+*Evaluated via `analysis/analyse_cryptographic_math.py` and `analysis/analyse_cryptographic_math.py`*
 
 Grounding the equation in the actual algorithmic complexity of Halo2's backend, Fast Fourier Transforms ($O(N \log N)$) and Multi-Scalar Multiplications ($O(N)$), yielded our final published equation:
 
@@ -425,6 +425,9 @@ pip install -r requirements.txt
 
 ```
 
+> **Note on File Paths for Execution:** During the original HPC batch processing, these scripts were executed in a flat directory structure. If you are reproducing this research locally using this structured repository, please note that some analysis scripts may contain local file path references (e.g., `pd.read_csv('circuit_features_master.csv')`). To run them successfully, either execute them directly from within the `data/` folder or quickly update the pandas read path in the script to `../data/[filename].csv`.
+
+
 ### 2. Running Benchmarks Locally
 
 To execute a local single-layer benchmark run (e.g., sweeping `Linear` layers):
@@ -440,13 +443,6 @@ To fit the final cryptographic non-linear model ($O(N \log N)$ FFTs) on the pre-
 
 ```bash
 python analysis/analyse_cryptographic_math.py
-
-```
-
-To view the detailed per-model itemization (Actual vs. Predicted):
-
-```bash
-python analysis/analyse_detailed_breakdown.py
 
 ```
 
