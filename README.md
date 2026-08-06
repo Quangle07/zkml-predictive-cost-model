@@ -10,6 +10,8 @@ This repository provides an empirical analysis of ZKML circuit compilation using
 
 We present a non-linear, zero-intercept cryptographic cost model evaluated across 50 benchmark runs. The model achieves an overall Mean Absolute Percentage Error (MAPE) of **12.69%** across distinct architectures (including deep Convolutional Neural Networks and Multi-Head Attention Transformer blocks) and demonstrates strong out-of-sample stability (**13.60% ± 4.10% MAPE**) under Repeated 5-Fold Cross-Validation.
 
+Finally, we apply this validated cost model to a real-world engineering problem: constructing an empirical Pareto frontier that maps cryptographic proving time against quantised model accuracy on the MNIST dataset. By evaluating 8 distinct neural network architectures across 5 bit-width quantization scales (4-bit to 16-bit), we define the optimal network architectures (depth vs. width) for ZK circuits, and identify a 12-bit precision optimal operating point that reduces proving overhead for non-linear activations by 66% with zero accuracy loss.
+
 ### **Repository Structure:**
 
 ```text
@@ -18,6 +20,7 @@ zkml-predictive-cost-model/
 ├── README.md                          # Project and results write-up
 ├── requirements.txt                   # Environment dependencies (PyTorch, EZKL, scikit-learn, etc.)
 ├── .gitignore                         # Excludes temporary cache files, HPC logs, and EZKL artefacts
+├── pareto_frontier_final.png          # Empirical Pareto frontier visualisation 
 │
 ├── benchmarks/                        # Python scripts that execute EZKL circuit compilations
 │   ├── benchmark_activation_complete.py
@@ -33,10 +36,13 @@ zkml-predictive-cost-model/
 │   ├── benchmark_sigmoid.py
 │   ├── benchmark_transformer_block.py # Full Transformer Block benchmarks
 │   ├── benchmark_transformers.py      # Transformer layer sweeps
+│   ├── compile_quantised_models.py    # Compiles Pareto models across 5 bit-width scales (4 to 16-bit)
 │   ├── deep_validation_benchmark.py
+│   ├── evaluate_true_quantised_accuracies.py # Simulates EZKL quantisation to extract true test accuracy
 │   ├── extract_and_validate_blind.py
 │   ├── extract_circuit_features.py    # Extracts A_total, L_span, and C_size from circuits
 │   └── fetch_srs.py
+│   └── train_mnist_models.py          # Trains the 8 baseline architectures on MNIST
 │
 ├── cluster_scripts/                   # SGE (.sh) batch submission scripts for Eddie HPC
 │   ├── run_benchmark_activation.sh
@@ -52,9 +58,12 @@ zkml-predictive-cost-model/
 │   ├── run_benchmark_transformer_block.sh
 │   ├── run_benchmark_transformers.sh
 │   ├── run_blind_test.sh
+│   ├── run_compile_quantised.sh
 │   ├── run_deep_validation.sh
 │   ├── run_extract_and_validate_blind.sh
 │   └── run_extract_circuit_features.sh
+│   ├── run_train_mnist.sh             
+│   └── run_true_accuracies.sh      
 │
 ├── data/                              # Benchmark result CSV datasets & output logs
 │   ├── activation_results_complete.csv
@@ -76,6 +85,7 @@ zkml-predictive-cost-model/
 │   ├── train_cost_model_results.txt
 │   ├── transformer_benchmark_results.csv
 │   └── transformer_block_results.csv  # Transformer benchmark dataset
+│   └── true_accuracies.txt            # Test accuracies for the 40 quantised configurations
 │
 └── analysis/                          # Mathematical fitting & cross-validation scripts
     ├── analyse_5fold_cv.py            # 5-fold cross-validation script
@@ -91,9 +101,11 @@ zkml-predictive-cost-model/
     ├── analyse_step_function.py
     ├── analyse_transformers.py
     ├── analyse_true_hybrid.py
+    ├── evaluate_pareto_costs.py       # Predicts proving times for the 40 Pareto configuration
     ├── fit_cost_model.py              # Phase 1-5: Early layer-additive OLS model
     ├── plot_activation_results.py
     ├── plot_combinatorial_results.py
+    ├── plot_pareto_frontier.py        # Generates the final empirical Pareto frontier visualisation
     └── train_cost_model.py
 ```
 
