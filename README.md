@@ -499,3 +499,41 @@ To submit benchmark runs to an SGE cluster (like the University of Edinburgh's E
 qsub cluster_scripts/run_benchmark_conv2d.sh
 
 ```
+
+### 5. Generating the Empirical Pareto Frontier
+
+To reproduce the full 40-configuration Pareto frontier (Phase 12), execute the following in order. (Note: On HPC clusters, use the corresponding `.sh` batch scripts located in `cluster_scripts/` for the heavy compilation and evaluation steps).
+
+**A. Train the 8 Baseline Architectures:**
+```bash
+python benchmarks/train_mnist_models.py
+
+```
+
+**B. Compile the 40 Quantised ZK Circuits (4-bit to 16-bit):**
+
+```bash
+python benchmarks/compile_quantised_models.py
+
+```
+
+**C. Predict Proving Times using the Cost Model:**
+
+```bash
+python analysis/evaluate_pareto_costs.py
+
+```
+
+**D. Extract the True Quantised Test Accuracies:**
+
+```bash
+python benchmarks/evaluate_true_quantised_accuracies.py
+
+```
+
+**E. Generate the Pareto Frontier Visualisation:**
+
+```bash
+python analysis/plot_pareto_frontier.py
+
+```
