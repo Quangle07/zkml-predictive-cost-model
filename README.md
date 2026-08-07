@@ -9,7 +9,7 @@ This research was conducted during a summer undergraduate research experience at
 * **Author:** Huy Quang Le (BSc Mathematics, University of Bristol)
 * **PhD Supervisor:** Wan Ki (Thomas) Wong (PhD Researcher, ANGLE Lab, School of Informatics, University of Edinburgh)
 * **Principal Investigator:** Dr. Rik Sarkar (Director of ANGLE Lab, School of Informatics, University of Edinburgh)
-* **Compute Resources:** All high-performance benchmarks and cluster sweeps were executed on the **University of Edinburgh's Eddie HPC Cluster**.
+* **Compute Resources:** All benchmarks and cluster sweeps were executed on the **University of Edinburgh's Eddie HPC Cluster**.
 
 ### **Abstract:**
 
@@ -220,6 +220,14 @@ Extracted from the itemised predictions in `analysis/analyse_cryptographic_math.
 
 All experiments were executed on the University of Edinburgh's Eddie HPC Cluster using dedicated compute nodes running Linux CentOS 7, Python 3.10, PyTorch 2.13.0+cu130, and EZKL 23.0.5 (Halo2 backend).
 
+To derive the final cryptographic model, we ran thousands of compiled circuits to break down standard machine learning assumptions. The journey to the formula happened across three core research milestones:
+
+### 1. Breaking the Linear Additivity Assumption
+Initial tests proved that summing PyTorch layer latencies fundamentally fails for ZKML. Compiler graph fusion (e.g., `Conv2d` $\to$ `ReLU`) and horizontal column packing mean that adding layers often incurs zero additional proving time, up until the constraint grid hits the discrete $2^{18}$ row hardware wall.
+
+<details>
+<summary><b>Click to expand experimental data (Phases 1, 3, 5, 6)</b></summary>
+
 ### Phase 1: The Non-Additivity Discovery
 
 *Generated via `benchmarks/benchmark_linear_only.py` and `benchmarks/benchmark_linear_relu.py` (Dataset: `data/linear_only_results.csv`)*
@@ -234,23 +242,6 @@ Comparing an isolated `Linear` layer (1 -> N outputs) against a fused `Linear + 
 | **10,000** | 78.73s | 85.76s | 17 | 2.84 MB |
 
 > **Key Finding:** Fusing `ReLU` and a second `Linear` layer incurs **zero additional proving time penalty**. Graph optimisation and horizontal column packing allow composite arithmetic operations to share the same grid bounds (2^17 = 131,072 rows).
-
----
-
-### Phase 2: Non-Linear Lookup Tables (`Sigmoid`) vs. Arithmetic
-
-*Generated via `benchmarks/benchmark_sigmoid.py` (Dataset: `data/sigmoid_results.csv`)*
-
-Non-linear operations require fixed-point lookup tables (LUTs) in Halo2. Sweeping a single `Sigmoid` layer up to 10,000 elements reveals a distinct trade-off between time complexity and proof payload space.
-
-| Input Elements ($N$) | `Linear` Time | `Sigmoid` Time | `Linear` Proof Size | `Sigmoid` Proof Size |
-| --- | --- | --- | --- | --- |
-| **2,000** | 38.04s | 37.32s | 0.30 MB | 0.58 MB |
-| **4,000** | 60.93s | 37.31s | 0.59 MB | 1.14 MB |
-| **8,000** | 88.86s | 38.01s | 1.17 MB | 2.26 MB |
-| **10,000** | 85.76s | 67.18s | 1.45 MB | 2.84 MB |
-
-> **Key Finding:** `Sigmoid` lookup tables exhibit lower proving latency at small-to-medium scales because element-wise lookups avoid dense cross-multiplication. However, non-linear lookup tables **double the final proof size** due to the requirement of embedding table commitments.
 
 ---
 
@@ -270,22 +261,6 @@ Sweeping output channel count ($C_{\text{out}} \in [4, 60]$) on a fixed $16 \tim
 | **56 – 60** | 17 | ~210.1s | +33.5s |
 
 > **Key Finding:** Proving time grows in discrete **~33–35 second steps**. Because `logrows` remains constant at 17, each step jump corresponds to EZKL allocating an additional column to the Halo2 constraint matrix to pack the operations horizontally.
-
----
-
-### Phase 4: Composite CNN Pipeline & Downsampling
-
-*Generated via `benchmarks/benchmark_rigorous_suite.py` (Dataset: `data/high_res_rigorous_results.csv`)*
-
-Benchmarking a full multi-layer CNN pipeline (`Conv2d -> ReLU -> MaxPool2d -> Linear`) highlights the effect of spatial downsampling on proof size.
-
-| Output Channels | Pipeline Proving Time | Isolated `Conv2d` Time | Pipeline Proof Size | Isolated `Conv2d` Proof Size |
-| --- | --- | --- | --- | --- |
-| **8** | 75.73s | 41.90s | **0.13 MB** | 0.41 MB |
-| **16** | 127.04s | 74.64s | **0.15 MB** | 0.71 MB |
-| **24** | 183.95s | 111.91s | **0.16 MB** | 1.01 MB |
-
-> **Key Finding:** While the composite pipeline adds proving latency due to additional operations, `MaxPool2d` spatial downsampling ($16 \times 16 \to 8 \times 8$) contracts the final output commitment space, **reducing total proof payload size by over 80%**.
 
 ---
 
@@ -323,6 +298,47 @@ To test the physical limits of `logrows` ($k$), we executed a high-resolution ch
 
 ---
 
+</details>
+
+### 2. Isolating the Transformer vs. CNN Bottlenecks
+By sweeping non-linear `Sigmoid` layers against dense spatial `Conv2d` pipelines, we isolated two distinct penalties: CNNs are bound by dense grid assignments ($A_{\text{total}}$), while Transformers take more than double the proving time at equivalent parameter scales due to massive fixed-point lookup tables ($L_{\text{span}}$) required for GELU/Softmax.
+
+<details>
+<summary><b>Click to expand experimental data (Phases 2, 4, 7)</b></summary>
+
+### Phase 2: Non-Linear Lookup Tables (`Sigmoid`) vs. Arithmetic
+
+*Generated via `benchmarks/benchmark_sigmoid.py` (Dataset: `data/sigmoid_results.csv`)*
+
+Non-linear operations require fixed-point lookup tables (LUTs) in Halo2. Sweeping a single `Sigmoid` layer up to 10,000 elements reveals a distinct trade-off between time complexity and proof payload space.
+
+| Input Elements ($N$) | `Linear` Time | `Sigmoid` Time | `Linear` Proof Size | `Sigmoid` Proof Size |
+| --- | --- | --- | --- | --- |
+| **2,000** | 38.04s | 37.32s | 0.30 MB | 0.58 MB |
+| **4,000** | 60.93s | 37.31s | 0.59 MB | 1.14 MB |
+| **8,000** | 88.86s | 38.01s | 1.17 MB | 2.26 MB |
+| **10,000** | 85.76s | 67.18s | 1.45 MB | 2.84 MB |
+
+> **Key Finding:** `Sigmoid` lookup tables exhibit lower proving latency at small-to-medium scales because element-wise lookups avoid dense cross-multiplication. However, non-linear lookup tables **double the final proof size** due to the requirement of embedding table commitments.
+
+---
+
+### Phase 4: Composite CNN Pipeline & Downsampling
+
+*Generated via `benchmarks/benchmark_rigorous_suite.py` (Dataset: `data/high_res_rigorous_results.csv`)*
+
+Benchmarking a full multi-layer CNN pipeline (`Conv2d -> ReLU -> MaxPool2d -> Linear`) highlights the effect of spatial downsampling on proof size.
+
+| Output Channels | Pipeline Proving Time | Isolated `Conv2d` Time | Pipeline Proof Size | Isolated `Conv2d` Proof Size |
+| --- | --- | --- | --- | --- |
+| **8** | 75.73s | 41.90s | **0.13 MB** | 0.41 MB |
+| **16** | 127.04s | 74.64s | **0.15 MB** | 0.71 MB |
+| **24** | 183.95s | 111.91s | **0.16 MB** | 1.01 MB |
+
+> **Key Finding:** While the composite pipeline adds proving latency due to additional operations, `MaxPool2d` spatial downsampling ($16 \times 16 \to 8 \times 8$) contracts the final output commitment space, **reducing total proof payload size by over 80%**.
+
+---
+
 ### Phase 7: Isolating Non-Linear Transformers & GELU Lookup Spikes
 
 *Generated via `benchmarks/benchmark_transformer_block.py` and `benchmarks/benchmark_transformers.py` (Dataset: `data/transformer_block_results.csv`, Evaluated via `analysis/analyse_transformers.py`)*
@@ -340,91 +356,17 @@ To capture both linear and non-linear bottlenecks, we expanded benchmarks to inc
 
 ---
 
-### Phase 8: Circuit Feature Extraction & Ridge L2 Regularisation Failure
+</details>
 
-*Extracted via `benchmarks/extract_circuit_features.py` (Dataset: `data/circuit_features_master.csv`, Evaluated via `analysis/train_cost_model.py`)*
+### 3. Obtaining the Cryptographic Cost Formula
+Standard ML cost models (Ridge Regression with baselines) failed with a 51% error rate. By stripping out artificial intercepts and applying Non-Negative Least Squares (NNLS) strictly to the Halo2 circuit features, the model converged on the underlying $O(N \log N)$ FFT scaling laws, dropping prediction errors to ~12%.
 
-Moving away from PyTorch layers, we extracted raw circuit features ($A_{\text{total}}, L_{\text{span}}, C_{\text{size}}, D_{\text{size}}$) and fitted a Ridge (L2 Penalised) Regression model with a fixed intercept ($R_{\text{base}}$):
+<details>
+<summary><b>Click to expand experimental data (Phases 8, 9, 10, 11)</b></summary>
 
-$$\text{Predicted Time} = R_{\text{base}} + w_1 A_{\text{total}} + w_2 L_{\text{span}} + w_3 C_{\text{size}} + w_4 D_{\text{size}}$$
 
-| Model Test Run | Parameter Size | Actual Proving Time | Ridge Predicted Time | Error (%) |
-| --- | --- | --- | --- | --- |
-| **MiniCNN** | Size 14 | 141.66s | 74.78s | **47.21%** |
-| **MiniCNN** | Size 22 | 285.84s | 116.71s | **59.17%** |
-| **MiniCNN** | Size 30 | 287.43s | 131.94s | **54.10%** |
-| **TransformerBlock** | Size 18 | 289.79s | 161.21s | **44.37%** |
-| **Overall Dataset** | — | — | — | **51.21% MAPE** |
 
-> **Why it Failed:** Because we forced an intercept ($R_{\text{base}}$) and applied L2 regularisation, the penalty acted like a rubber band—dragging all large prediction weights down by exactly 50%.
-
----
-
-### Phase 9: The Zero-Intercept Pure Physics Model (NNLS)
-
-*Evaluated via `analysis/analyse_final_physics.py`*
-
-We stripped out the L2 penalty and artificial intercept, applying unpenalised Non-Negative Least Squares (NNLS) directly to pure circuit features:
-
-$$\widehat{T}_{\text{prove}} = (1.51 \times 10^{-4}) \cdot A_{\text{total}} + (1.00 \times 10^{-3}) \cdot L_{\text{span}} + (6.49 \times 10^{-2}) \cdot C_{\text{size}}$$
-
-| Evaluation Dataset | Primary Feature Tested | Overall Dataset MAPE | Key Observation |
-| --- | --- | --- | --- |
-| **`transformer_block_results.csv`** | Non-Linear Lookups ($L_{\text{span}}$) | **9.45%** | Successfully isolated GELU lookup penalties |
-| **`high_res_rigorous_results.csv`** | Dense Grid Assignments ($A_{\text{total}}$) | **11.41%** | Sub-5% error on large CNNs ($S \ge 32$) |
-| **`deep_validation_results.csv`** | Unseen Topologies | **22.71%** | Higher error on small discrete models |
-| **5-Fold Cross-Validation** | Randomised Splits | **12.56%** | High coefficient stability across folds |
-
-> **Key Finding:** Removing artificial baseline intercepts forced the solver to mirror the circuit's true physical properties, cutting overall prediction errors from ~51% down to ~12.5%.
-
----
-
-### Phase 10: Cross-Architecture Stress Test (LOAO)
-
-*Evaluated via `analysis/analyse_loao.py`*
-
-To test whether a model trained on one network family could predict another, we performed Leave-One-Architecture-Out (LOAO) zero-shot validation across CNNs and Transformers.
-
-| Training Family | Unseen Test Family | Zero-Shot MAPE | Failure Mode Analysis |
-| --- | --- | --- | --- |
-| **43 CNN Models** | **7 Transformers** | **41.25%** | CNNs lack lookups; model under-predicted GELU penalties |
-| **7 Transformers** | **43 CNN Models** | **46.99%** | Over-penalised lookups; over-predicted dense matrix maths |
-
-> **Key Finding:** Plonkish arithmetisation is a **multi-bottleneck system**. Training data *must* contain both dense maths (CNNs) and lookup tables (Transformers) for the solver to accurately balance the coefficients.
-
----
-
-### Phase 11: Final Cryptographic Non-Linear Model & Asymptotic Scaling
-
-*Evaluated via `analysis/analyse_cryptographic_math.py` and `analysis/analyse_cryptographic_math.py`*
-
-Grounding the equation in the actual algorithmic complexity of Halo2's backend, Fast Fourier Transforms ($O(N \log N)$) and Multi-Scalar Multiplications ($O(N)$), yielded our final published equation:
-
-$$\widehat{T}_{\text{prove}} \approx (2.94 \times 10^{-8}) \cdot (D_{\text{size}} \log_2 D_{\text{size}}) + (1.51 \times 10^{-4}) \cdot A_{\text{total}} + (9.77 \times 10^{-4}) \cdot L_{\text{span}} + (6.63 \times 10^{-2}) \cdot C_{\text{size}}$$
-
-#### Itemised Accuracy Breakdown Across All Architectures
-
-| Model Family | Size / Config | Actual Time | Predicted Time | Difference | Error (%) |
-| --- | --- | --- | --- | --- | --- |
-| **MiniCNN** | Size 8 | 62.27s | 96.39s | +34.12s | **54.79%** (Noise at low scale) |
-| **MiniCNN** | Size 16 | 108.84s | 129.65s | +20.81s | **19.13%** |
-| **MiniCNN** | Size 32 | 218.56s | 214.43s | -4.13s | **1.89%** |
-| **MiniCNN** | Size 40 | 254.58s | 256.92s | +2.34s | **0.92%** |
-| **MiniCNN** | Size 56 | 339.54s | 345.10s | +5.56s | **1.64%** |
-| **MiniCNN** | Size 64 | 395.99s | 387.93s | -8.06s | **2.03%** |
-| **TransformerBlock** | Size 16 | 276.73s | 301.62s | +24.89s | **9.00%** |
-| **TransformerBlock** | Size 18 | 289.79s | 292.55s | +2.76s | **0.95%** |
-| **TransformerBlock** | Size 32 | 417.83s | 389.49s | -28.34s | **6.78%** |
-
-#### Rigorous Validation Summary
-
-| Validation Method | Total Iterations | Evaluated Metric | Result |
-| --- | --- | --- | --- |
-| **Repeated 5-Fold CV** | 10 Seeds (50 Splits) | Out-of-Sample Mean MAPE | **13.60% ($\pm 4.10\%$)** |
-| **Leave-One-Config-Out** | 18 Configuration Groups | Strict Unseen Group MAPE | **20.20%** |
-| **Asymptotic Large-Scale** | Models $S \ge 32$ ($T > 200\text{s}$) | Asymptotic Proving MAPE | **1.5% – 3.0%** |
-
-> **Final Conclusion:** At low scales, fixed system setup noise causes higher percentage errors. But as the neural network grows and fills the grid, noise vanishes, and proving time **strictly obeys our $O(N \log N)$ cryptographic equation**.
+</details>
 
 ---
 
@@ -444,7 +386,7 @@ Because non-linear operations (like GELU and Sigmoid) require physical lookup ta
 #### 2. Architectural Configuration: Depth Beats Width
 In standard ML, wide and deep networks might exhibit similar GPU latencies. In ZKML, active cell assignments dictate cost. Model E (Deep, narrow MLP) achieved $97.22\%$ accuracy in just **19.46s**, whereas Model A (Shallow, wide MLP) took **41.67s** to achieve similar results. ZK architectures should therefore prioritise layer depth over neuron width.
 
-#### 3. The 8-Bit Quantization Floor
+#### 3. The 8-Bit Quantizasion Floor
 Naive post-training quantisation holds strong down to 8 bits. However, crossing into 6-bit or 4-bit precision without ZK-aware retraining caused an accuracy collapse (dropping to 10%–30%), therefore establishing 8-bit as the functional floor for out-of-the-box EZKL compilation.
 
 #### 4. The Convolutional Overhead
