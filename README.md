@@ -2,6 +2,15 @@
 
 An empirical benchmark suite and predictive performance framework for Zero-Knowledge Machine Learning (ZKML) circuits compiled via EZKL (Halo2 proof system backend).
 
+## **Context & Acknowledgments**
+
+This research was conducted during a summer undergraduate research experience at the **University of Edinburgh's School of Informatics**. The project was facilitated by the **UKRI Centre for Doctoral Training (CDT) in Machine Learning Systems**. 
+
+* **Author:** Huy Quang Le (BSc Mathematics, University of Bristol)
+* **PhD Supervisor:** Wan Ki (Thomas) Wong (PhD Researcher, ANGLE Lab, School of Informatics, University of Edinburgh)
+* **Principal Investigator:** Dr. Rik Sarkar (Director of ANGLE Lab, School of Informatics, University of Edinburgh)
+* **Compute Resources:** All high-performance benchmarks and cluster sweeps were executed on the **University of Edinburgh's Eddie HPC Cluster**.
+
 ### **Abstract:**
 
 Evaluating the resource cost (proving time, peak RAM, and proof size) of Zero-Knowledge Machine Learning (ZKML) remains a major barrier to deploying verifiable AI. Traditional cost estimations assume linear additivity, where total prover time equals the sum of individual layer latencies.
